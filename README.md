@@ -1,6 +1,7 @@
 # Vaulted Share Secret
 
 [![GitHub Marketplace](https://img.shields.io/badge/Marketplace-Vaulted%20Share%20Secret-purple?logo=github)](https://github.com/marketplace/actions/vaulted-share-secret)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/vaulted-fyi/share-secret/badge)](https://scorecard.dev/viewer/?uri=github.com/vaulted-fyi/share-secret)
 
 Create and retrieve **end-to-end encrypted, self-destructing** secret links in GitHub Actions via [vaulted.fyi](https://vaulted.fyi).
 

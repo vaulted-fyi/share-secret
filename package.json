@@ -15,10 +15,10 @@
     "@vaulted/crypto": "^1.0.0"
   },
   "devDependencies": {
-    "@types/node": "^20",
+    "@types/node": "^25",
     "@vercel/ncc": "^0.38.3",
-    "typescript": "^5.0.0",
-    "vitest": "^4.0.0"
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.5"
   },
   "engines": {
     "node": ">=20"

@@ -11,6 +11,7 @@
   "labels": ["dependencies"],
   "rangeStrategy": "bump",
   "platformAutomerge": true,
+  "prHourlyLimit": 2,
   "prConcurrentLimit": 10,
   "packageRules": [
     {

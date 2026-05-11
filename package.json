@@ -15,8 +15,8 @@
     "@vaulted/crypto": "^1.0.0"
   },
   "devDependencies": {
-    "@types/node": "^25",
-    "@vercel/ncc": "^0.38.3",
+    "@types/node": "^25.6.2",
+    "@vercel/ncc": "^0.38.4",
     "typescript": "^6.0.3",
     "vitest": "^4.1.5"
   },

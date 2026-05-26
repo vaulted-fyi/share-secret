@@ -1,15 +1,23 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { createSecret } from './create.js'
+import { USER_AGENT } from './http.js'
 
 const mockSetOutput = vi.fn()
 const mockSetFailed = vi.fn()
+const mockNotice = vi.fn()
 vi.mock('@actions/core', () => ({
   setOutput: (...args: unknown[]) => mockSetOutput(...args),
   setFailed: (...args: unknown[]) => mockSetFailed(...args),
+  notice: (...args: unknown[]) => mockNotice(...args),
 }))
 
 const mockFetch = vi.fn()
 global.fetch = mockFetch
+
+function headerValue(init: RequestInit | undefined, name: string): string | null {
+  const headers = new Headers(init?.headers)
+  return headers.get(name)
+}
 
 describe('createSecret', () => {
   beforeEach(() => {
@@ -47,6 +55,18 @@ describe('createSecret', () => {
     )
   })
 
+  it('sends a User-Agent header on every request', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ id: 'ua-id' }),
+    })
+
+    await createSecret({ secret: 'x', views: 1, expires: '24h' })
+
+    const [, fetchOpts] = mockFetch.mock.calls[0]
+    expect(headerValue(fetchOpts, 'User-Agent')).toBe(USER_AGENT)
+  })
+
   it('handles passphrase-protected secrets', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
@@ -78,5 +98,36 @@ describe('createSecret', () => {
     await expect(
       createSecret({ secret: 'test', views: 1, expires: '24h' })
     ).rejects.toThrow('API error (429): Rate limited')
+  })
+
+  it('surfaces server message verbatim on error responses', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 503,
+      json: async () => ({
+        error: 'service_unavailable',
+        message: 'Vaulted is down for maintenance until 18:00 UTC.',
+      }),
+    })
+
+    await expect(
+      createSecret({ secret: 'test', views: 1, expires: '24h' })
+    ).rejects.toThrow('Vaulted is down for maintenance until 18:00 UTC.')
+  })
+
+  it('emits a notice when the server attaches a message to a successful response', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        id: 'notice-id',
+        message: 'Heads up: free tier limits will change next month.',
+      }),
+    })
+
+    await createSecret({ secret: 'test', views: 1, expires: '24h' })
+
+    expect(mockNotice).toHaveBeenCalledWith(
+      'Heads up: free tier limits will change next month.'
+    )
   })
 })

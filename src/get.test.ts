@@ -6,16 +6,24 @@ import {
   wrapKeyWithPassphrase,
 } from '@vaulted/crypto'
 import { getSecret } from './get.js'
+import { USER_AGENT } from './http.js'
 
 const mockSetOutput = vi.fn()
 const mockSetSecret = vi.fn()
+const mockNotice = vi.fn()
 vi.mock('@actions/core', () => ({
   setOutput: (...args: unknown[]) => mockSetOutput(...args),
   setSecret: (...args: unknown[]) => mockSetSecret(...args),
+  notice: (...args: unknown[]) => mockNotice(...args),
 }))
 
 const mockFetch = vi.fn()
 global.fetch = mockFetch
+
+function headerValue(init: RequestInit | undefined, name: string): string | null {
+  const headers = new Headers(init?.headers)
+  return headers.get(name)
+}
 
 describe('getSecret', () => {
   beforeEach(() => {
@@ -41,7 +49,8 @@ describe('getSecret', () => {
       url: `https://vaulted.fyi/s/abc123#${keyStr}`,
     })
 
-    expect(mockFetch).toHaveBeenCalledWith('https://vaulted.fyi/api/secrets/abc123')
+    const [fetchUrl] = mockFetch.mock.calls[0]
+    expect(fetchUrl).toBe('https://vaulted.fyi/api/secrets/abc123')
 
     const secretCallOrder = mockSetSecret.mock.invocationCallOrder[0]
     const outputCallOrder = mockSetOutput.mock.invocationCallOrder[0]
@@ -49,6 +58,22 @@ describe('getSecret', () => {
 
     expect(mockSetSecret).toHaveBeenCalledWith('my-secret-value')
     expect(mockSetOutput).toHaveBeenCalledWith('secret', 'my-secret-value')
+  })
+
+  it('sends a User-Agent header on every request', async () => {
+    const key = await generateKey()
+    const keyStr = await exportKey(key)
+    const { ciphertext, iv } = await encrypt('x', key)
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ ciphertext, iv, hasPassphrase: false }),
+    })
+
+    await getSecret({ url: `https://vaulted.fyi/s/ua#${keyStr}` })
+
+    const [, fetchOpts] = mockFetch.mock.calls[0]
+    expect(headerValue(fetchOpts, 'User-Agent')).toBe(USER_AGENT)
   })
 
   it('masks each line of multi-line secrets individually', async () => {
@@ -123,7 +148,7 @@ describe('getSecret', () => {
     ).rejects.toThrow('passphrase')
   })
 
-  it('throws on 404', async () => {
+  it('throws on 404 with default message when server returns no message', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: false,
       status: 404,
@@ -133,6 +158,41 @@ describe('getSecret', () => {
     await expect(
       getSecret({ url: 'https://vaulted.fyi/s/gone#key' })
     ).rejects.toThrow('Secret not found or already expired')
+  })
+
+  it('surfaces server message verbatim on error responses', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 410,
+      json: async () => ({
+        error: 'revoked',
+        message: 'This secret was revoked by the sender.',
+      }),
+    })
+
+    await expect(
+      getSecret({ url: 'https://vaulted.fyi/s/revoked#key' })
+    ).rejects.toThrow('This secret was revoked by the sender.')
+  })
+
+  it('emits a notice when the server attaches a message to a successful response', async () => {
+    const key = await generateKey()
+    const keyStr = await exportKey(key)
+    const { ciphertext, iv } = await encrypt('value', key)
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        ciphertext,
+        iv,
+        hasPassphrase: false,
+        message: 'Action v1 is deprecated. Upgrade to v2.',
+      }),
+    })
+
+    await getSecret({ url: `https://vaulted.fyi/s/notice#${keyStr}` })
+
+    expect(mockNotice).toHaveBeenCalledWith('Action v1 is deprecated. Upgrade to v2.')
   })
 
   it('throws on invalid URL format', async () => {

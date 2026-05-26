@@ -31332,22 +31332,37 @@ function base64urlToBuffer(base64url) {
 }
 
 
+;// CONCATENATED MODULE: ./src/http.ts
+const USER_AGENT = 'vaulted-share-secret-action/1.0.0';
+function vaultedFetch(input, init = {}) {
+    const headers = new Headers(init.headers);
+    headers.set('User-Agent', USER_AGENT);
+    return fetch(input, { ...init, headers });
+}
+
 ;// CONCATENATED MODULE: ./src/get.ts
+
 
 
 async function getSecret(opts) {
     const parsed = parseVaultedUrl(opts.url);
-    const response = await fetch(`${parsed.origin}/api/secrets/${parsed.id}`);
+    const response = await vaultedFetch(`${parsed.origin}/api/secrets/${parsed.id}`);
     if (!response.ok) {
+        const body = await readJsonSafe(response);
+        if (body.message) {
+            throw new Error(body.message);
+        }
         if (response.status === 404) {
             throw new Error('Secret not found or already expired.');
         }
-        const data = (await response.json());
-        throw new Error(`API error (${response.status}): ${data.error}`);
+        throw new Error(`API error (${response.status}): ${body.error ?? 'unknown error'}`);
     }
-    const { ciphertext, iv, hasPassphrase } = (await response.json());
+    const data = (await response.json());
+    if (data.message) {
+        core.notice(data.message);
+    }
     let key;
-    if (hasPassphrase) {
+    if (data.hasPassphrase) {
         if (!opts.passphrase) {
             throw new Error('Secret requires a passphrase. Provide the "passphrase" input.');
         }
@@ -31357,7 +31372,7 @@ async function getSecret(opts) {
     else {
         key = await importKey(parsed.fragment);
     }
-    const plaintext = await decrypt(ciphertext, iv, key);
+    const plaintext = await decrypt(data.ciphertext, data.iv, key);
     core.setSecret(plaintext);
     for (const line of plaintext.split('\n')) {
         if (line.trim()) {
@@ -31365,6 +31380,14 @@ async function getSecret(opts) {
         }
     }
     core.setOutput('secret', plaintext);
+}
+async function readJsonSafe(response) {
+    try {
+        return (await response.json());
+    }
+    catch {
+        return {};
+    }
 }
 function parseVaultedUrl(url) {
     const hashIndex = url.indexOf('#');

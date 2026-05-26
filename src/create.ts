@@ -5,6 +5,7 @@ import {
   encrypt,
   wrapKeyWithPassphrase,
 } from '@vaulted/crypto'
+import { vaultedFetch } from './http.js'
 
 const API_HOST = 'https://vaulted.fyi'
 
@@ -38,7 +39,7 @@ export async function createSecret(opts: CreateOptions): Promise<void> {
 
   const ttl = EXPIRES_MAP[opts.expires]
 
-  const response = await fetch(`${API_HOST}/api/secrets`, {
+  const response = await vaultedFetch(`${API_HOST}/api/secrets`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -50,12 +51,23 @@ export async function createSecret(opts: CreateOptions): Promise<void> {
     }),
   })
 
-  if (!response.ok) {
-    const data = (await response.json()) as { error: string }
-    throw new Error(`API error (${response.status}): ${data.error}`)
+  const data = (await response.json()) as {
+    id?: string
+    error?: string
+    message?: string
   }
 
-  const { id } = (await response.json()) as { id: string }
+  if (!response.ok) {
+    throw new Error(
+      data.message ?? `API error (${response.status}): ${data.error ?? 'unknown error'}`
+    )
+  }
+
+  if (data.message) {
+    core.notice(data.message)
+  }
+
+  const id = data.id as string
   const url = `${API_HOST}/s/${id}#${fragment}`
 
   core.setOutput('id', id)

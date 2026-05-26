@@ -31332,7 +31332,16 @@ function base64urlToBuffer(base64url) {
 }
 
 
+;// CONCATENATED MODULE: ./src/http.ts
+const USER_AGENT = 'vaulted-share-secret-action/1.0.0';
+function vaultedFetch(input, init = {}) {
+    const headers = new Headers(init.headers);
+    headers.set('User-Agent', USER_AGENT);
+    return fetch(input, { ...init, headers });
+}
+
 ;// CONCATENATED MODULE: ./src/create.ts
+
 
 
 const API_HOST = 'https://vaulted.fyi';
@@ -31355,7 +31364,7 @@ async function createSecret(opts) {
         fragment = await exportKey(key);
     }
     const ttl = EXPIRES_MAP[opts.expires];
-    const response = await fetch(`${API_HOST}/api/secrets`, {
+    const response = await vaultedFetch(`${API_HOST}/api/secrets`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -31366,11 +31375,14 @@ async function createSecret(opts) {
             hasPassphrase,
         }),
     });
+    const data = (await response.json());
     if (!response.ok) {
-        const data = (await response.json());
-        throw new Error(`API error (${response.status}): ${data.error}`);
+        throw new Error(data.message ?? `API error (${response.status}): ${data.error ?? 'unknown error'}`);
     }
-    const { id } = (await response.json());
+    if (data.message) {
+        core.notice(data.message);
+    }
+    const id = data.id;
     const url = `${API_HOST}/s/${id}#${fragment}`;
     core.setOutput('id', id);
     core.setOutput('url', url);

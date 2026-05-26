@@ -4,6 +4,7 @@ import {
   decrypt,
   unwrapKeyWithPassphrase,
 } from '@vaulted/crypto'
+import { vaultedFetch } from './http.js'
 
 interface GetOptions {
   url: string
@@ -13,24 +14,32 @@ interface GetOptions {
 export async function getSecret(opts: GetOptions): Promise<void> {
   const parsed = parseVaultedUrl(opts.url)
 
-  const response = await fetch(`${parsed.origin}/api/secrets/${parsed.id}`)
+  const response = await vaultedFetch(`${parsed.origin}/api/secrets/${parsed.id}`)
 
   if (!response.ok) {
+    const body = await readJsonSafe(response)
+    if (body.message) {
+      throw new Error(body.message)
+    }
     if (response.status === 404) {
       throw new Error('Secret not found or already expired.')
     }
-    const data = (await response.json()) as { error: string }
-    throw new Error(`API error (${response.status}): ${data.error}`)
+    throw new Error(`API error (${response.status}): ${body.error ?? 'unknown error'}`)
   }
 
-  const { ciphertext, iv, hasPassphrase } = (await response.json()) as {
+  const data = (await response.json()) as {
     ciphertext: string
     iv: string
     hasPassphrase: boolean
+    message?: string
+  }
+
+  if (data.message) {
+    core.notice(data.message)
   }
 
   let key
-  if (hasPassphrase) {
+  if (data.hasPassphrase) {
     if (!opts.passphrase) {
       throw new Error('Secret requires a passphrase. Provide the "passphrase" input.')
     }
@@ -40,7 +49,7 @@ export async function getSecret(opts: GetOptions): Promise<void> {
     key = await importKey(parsed.fragment)
   }
 
-  const plaintext = await decrypt(ciphertext, iv, key)
+  const plaintext = await decrypt(data.ciphertext, data.iv, key)
 
   core.setSecret(plaintext)
 
@@ -51,6 +60,16 @@ export async function getSecret(opts: GetOptions): Promise<void> {
   }
 
   core.setOutput('secret', plaintext)
+}
+
+async function readJsonSafe(
+  response: Response
+): Promise<{ error?: string; message?: string }> {
+  try {
+    return (await response.json()) as { error?: string; message?: string }
+  } catch {
+    return {}
+  }
 }
 
 function parseVaultedUrl(url: string): { origin: string; id: string; fragment: string } {

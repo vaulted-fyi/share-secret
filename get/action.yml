@@ -15,7 +15,7 @@ outputs:
     description: 'The decrypted secret value (masked in logs)'
 
 runs:
-  using: 'node20'
+  using: 'node24'
   main: '../dist/get/index.js'
 
 branding:

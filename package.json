@@ -18,12 +18,12 @@
     "@types/node": "^25.9.2",
     "@vercel/ncc": "^0.38.4",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.8"
+    "vitest": "^4.1.12"
   },
   "engines": {
     "node": ">=20"
   },
   "overrides": {
-    "undici": "^6.27.0"
+    "undici": "^6.29.1"
   }
 }

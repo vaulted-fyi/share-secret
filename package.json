@@ -4,9 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "npm run build:create && npm run build:get",
-    "build:create": "ncc build src/index.ts -o dist/create --source-map --license licenses.txt",
-    "build:get": "ncc build src/get-index.ts -o dist/get --source-map --license licenses.txt",
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"
   },
@@ -16,8 +15,8 @@
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
-    "@vercel/ncc": "^0.45.0",
-    "typescript": "^6.0.3",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2",
     "vitest": "^4.1.12"
   },
   "engines": {

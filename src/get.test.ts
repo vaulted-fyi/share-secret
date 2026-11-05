@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
   generateKey,
   exportKey,
+  importKey,
   encrypt,
   wrapKeyWithPassphrase,
 } from '@vaulted/crypto'
@@ -199,5 +200,44 @@ describe('getSecret', () => {
     await expect(
       getSecret({ url: 'https://example.com/not-valid' })
     ).rejects.toThrow('Invalid Vaulted URL')
+  })
+})
+
+// Known-answer fragments from published @vaulted/crypto releases. Each one pins
+// interop with links made by other Vaulted clients (web app, CLI, MCP server).
+// Do not regenerate.
+const RAW_KEY = 'AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8'
+const PASSPHRASE = 'correct horse battery staple'
+
+// Wrapped by @vaulted/crypto@1.0.0 at 100k PBKDF2 iterations.
+const FRAGMENT_100K = '-ImnvxXgniZa6NQXKwPt0TE69EQZ2QHCO10pdw9lyzd051VScqhhIQ.QKuy-Aem8ZU2eWZJuM2afw'
+
+// Wrapped by @vaulted/crypto@1.1.0 at 600k PBKDF2 iterations.
+const FRAGMENT_600K = '7HZ-r2yavMcECndppTugQOwIPfFIMJC5BzFWH8Kw3VfToQdE0niZTQ.Hm2Lm8Yci11MdjIZYK4Bdw'
+
+// Real PBKDF2 at up to 700k combined iterations; the default 5s timeout is too
+// tight on a loaded CI runner.
+describe('getSecret with passphrase links from other Vaulted clients', { timeout: 30_000 }, () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it.each([
+    ['600k', FRAGMENT_600K],
+    ['100k', FRAGMENT_100K],
+  ])('decrypts a %s-iteration fragment', async (_iterations, fragment) => {
+    const { ciphertext, iv } = await encrypt('cross-client-secret', await importKey(RAW_KEY))
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ ciphertext, iv, hasPassphrase: true }),
+    })
+
+    await getSecret({
+      url: `https://vaulted.fyi/s/interop#${fragment}`,
+      passphrase: PASSPHRASE,
+    })
+
+    expect(mockSetOutput).toHaveBeenCalledWith('secret', 'cross-client-secret')
   })
 })

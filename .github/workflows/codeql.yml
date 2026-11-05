@@ -39,6 +39,11 @@ jobs:
         with:
           languages: ${{ matrix.language }}
           queries: security-and-quality
+          # dist/ is the generated bundle of src/ plus third-party dependencies;
+          # src/ is analyzed directly and dependencies are covered by Dependabot.
+          config: |
+            paths-ignore:
+              - dist
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@1fc58d04a4d4374f921bdac573c3811c240f9c26 # v4.39.2

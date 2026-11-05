@@ -14,9 +14,8 @@ Part of the Vaulted ecosystem alongside the [web app](../vaulted/) and CLI. All 
 npm test                              # Run tests (vitest run)
 npm run test:watch                    # Watch mode
 npx vitest run src/create.test.ts     # Single test file
-npm run build                         # Bundle both actions via @vercel/ncc
-npm run build:create                  # Bundle create action only
-npm run build:get                     # Bundle get action only
+npm run typecheck                     # Type-check (tsc --noEmit, TypeScript 7)
+npm run build                         # Bundle both actions via esbuild (scripts/build.mjs)
 ```
 
 ## Architecture
@@ -45,7 +44,7 @@ https://vaulted.fyi/s/{id}#{wrappedKey}.{salt} # with passphrase
 
 ### Build System
 
-`@vercel/ncc` bundles each entry point + all dependencies into a single file in `dist/`. The `dist/` directory is committed and CI verifies it stays in sync (`git diff --exit-code dist/`).
+`scripts/build.mjs` uses esbuild to bundle each entry point + all dependencies into a single ESM file in `dist/` (`dist/create/`, `dist/get/`), with a source map and a `licenses.txt` of the bundled packages. esbuild only strips types, so type errors are caught by `npm run typecheck`, not the build. The `dist/` directory is committed and CI verifies it stays in sync (`git status --porcelain -- dist/`).
 
 **After any source change, run `npm run build` and commit `dist/`.**
 

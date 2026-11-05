@@ -25,8 +25,13 @@ jobs:
           node-version: 24.22.2
           cache: npm
       - run: npm ci
+      - run: npm run typecheck
       - run: npm test
       - run: npm run build
       - name: Verify dist is up to date
         run: |
-          git diff --exit-code dist/ || (echo "dist/ is out of date. Run 'npm run build' and commit." && exit 1)
+          if [ -n "$(git status --porcelain -- dist/)" ]; then
+            git status --short -- dist/
+            echo "dist/ is out of date. Run 'npm run build' and commit."
+            exit 1
+          fi

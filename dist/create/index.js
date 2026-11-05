@@ -31619,9 +31619,11 @@ async function decrypt(ciphertext, iv, key) {
   );
   return new TextDecoder().decode(decrypted);
 }
-var PBKDF2_ITERATIONS = 1e5;
+var PBKDF2_ITERATIONS = 6e5;
+var PBKDF2_ITERATIONS_LEGACY = 1e5;
 var SALT_LENGTH = 16;
-async function deriveWrappingKey(passphrase, salt) {
+var WRAPPED_KEY_LENGTH = 40;
+async function deriveWrappingKey(passphrase, salt, iterations) {
   const encoder = new TextEncoder();
   const keyMaterial = await crypto.subtle.importKey(
     "raw",
@@ -31634,7 +31636,7 @@ async function deriveWrappingKey(passphrase, salt) {
     {
       name: "PBKDF2",
       salt,
-      iterations: PBKDF2_ITERATIONS,
+      iterations,
       hash: "SHA-256"
     },
     keyMaterial,
@@ -31645,8 +31647,17 @@ async function deriveWrappingKey(passphrase, salt) {
 }
 async function wrapKeyWithPassphrase(key, passphrase) {
   const salt = crypto.getRandomValues(new Uint8Array(SALT_LENGTH));
-  const wrappingKey = await deriveWrappingKey(passphrase, salt);
-  const wrapped = await crypto.subtle.wrapKey("raw", key, wrappingKey, "AES-KW");
+  const wrappingKey = await deriveWrappingKey(
+    passphrase,
+    salt,
+    PBKDF2_ITERATIONS
+  );
+  const wrapped = await crypto.subtle.wrapKey(
+    "raw",
+    key,
+    wrappingKey,
+    "AES-KW"
+  );
   return {
     wrappedKey: bufferToBase64url(wrapped),
     salt: bufferToBase64url(salt.buffer)
@@ -31654,10 +31665,28 @@ async function wrapKeyWithPassphrase(key, passphrase) {
 }
 async function unwrapKeyWithPassphrase(wrappedKeyB64, saltB64, passphrase) {
   const salt = new Uint8Array(base64urlToBuffer(saltB64));
-  const wrappingKey = await deriveWrappingKey(passphrase, salt);
+  const wrapped = base64urlToBuffer(wrappedKeyB64);
+  if (wrapped.byteLength !== WRAPPED_KEY_LENGTH) {
+    throw new DOMException("Invalid wrapped key length", "DataError");
+  }
+  const current = unwrapWith(wrapped, salt, passphrase, PBKDF2_ITERATIONS);
+  const legacy = unwrapWith(
+    wrapped,
+    salt,
+    passphrase,
+    PBKDF2_ITERATIONS_LEGACY
+  );
+  try {
+    return await Promise.any([current, legacy]);
+  } catch {
+    return current;
+  }
+}
+async function unwrapWith(wrapped, salt, passphrase, iterations) {
+  const wrappingKey = await deriveWrappingKey(passphrase, salt, iterations);
   return crypto.subtle.unwrapKey(
     "raw",
-    base64urlToBuffer(wrappedKeyB64),
+    wrapped,
     wrappingKey,
     "AES-KW",
     { name: ALGORITHM, length: KEY_LENGTH },

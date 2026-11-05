@@ -19723,7 +19723,7 @@ function bufferToBase64url(buffer) {
 }
 
 // src/http.ts
-var USER_AGENT = "vaulted-share-secret-action/1.0.0";
+var USER_AGENT = "vaulted-share-secret-action/2.0.0";
 function vaultedFetch(input, init = {}) {
   const headers = new Headers(init.headers);
   headers.set("User-Agent", USER_AGENT);

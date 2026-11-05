@@ -11,7 +11,7 @@ Zero-knowledge encryption — your secret never touches the server in plaintext.
 
 ```yaml
 - name: Share deploy credentials
-  uses: vaulted-fyi/share-secret@v1
+  uses: vaulted-fyi/share-secret@v2
   id: share
   with:
     secret: ${{ secrets.STAGING_API_KEY }}
@@ -25,7 +25,7 @@ Zero-knowledge encryption — your secret never touches the server in plaintext.
 
 ```yaml
 - name: Fetch credentials
-  uses: vaulted-fyi/share-secret/get@v1
+  uses: vaulted-fyi/share-secret/get@v2
   id: fetch
   with:
     url: ${{ secrets.CREDS_URL }}
@@ -90,12 +90,16 @@ Always access the secret output via `env:` bindings, not inline expansion:
 
 Masked outputs cannot cross job boundaries — GitHub strips them. The `secret` output is only usable within the same job.
 
+## Requirements
+
+`v2` runs on the `node24` runtime. GitHub-hosted runners support it; self-hosted runners need [actions/runner](https://github.com/actions/runner) v2.327.1 or newer. On older runners, stay on `@v1`.
+
 ## Examples
 
 ### Post secret link as PR comment
 
 ```yaml
-- uses: vaulted-fyi/share-secret@v1
+- uses: vaulted-fyi/share-secret@v2
   id: share
   with:
     secret: ${{ secrets.REVIEW_CREDENTIALS }}
@@ -116,7 +120,7 @@ Masked outputs cannot cross job boundaries — GitHub strips them. The `secret` 
 ### Send to Slack
 
 ```yaml
-- uses: vaulted-fyi/share-secret@v1
+- uses: vaulted-fyi/share-secret@v2
   id: share
   with:
     secret: ${{ secrets.DEPLOY_KEY }}
@@ -131,7 +135,7 @@ Masked outputs cannot cross job boundaries — GitHub strips them. The `secret` 
 ### Passphrase-protected
 
 ```yaml
-- uses: vaulted-fyi/share-secret@v1
+- uses: vaulted-fyi/share-secret@v2
   with:
     secret: ${{ secrets.DATABASE_URL }}
     passphrase: ${{ secrets.SHARE_PASSPHRASE }}
